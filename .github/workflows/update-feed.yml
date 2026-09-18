@@ -1,22 +1,26 @@
-name: Mettre à jour l'agenda RSS
+name: Publier l'agenda RSS
 
 on:
   workflow_dispatch:
-  schedule:
-    # Chaque jeudi à 07:15, heure de Paris.
-    - cron: "15 7 * * 4"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/feed.xml"
+      - "docs/index.html"
+      - "docs/history.json"
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  update-feed:
+  deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -25,32 +29,6 @@ jobs:
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
-
-      - name: Installer Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Installer les dépendances
-        run: pip install -r requirements.txt
-
-      - name: Générer le flux
-        env:
-          SOURCE_RSS: "https://www.beaune-tourisme.fr/playlist/35902.rss"
-          COUNT: "6"
-        run: python generate_feed.py
-
-      - name: Mémoriser la sélection dans le dépôt
-        run: |
-          git config user.name "agenda-rss-bot"
-          git config user.email "agenda-rss-bot@users.noreply.github.com"
-          git add docs/feed.xml docs/index.html docs/history.json
-          if git diff --cached --quiet; then
-            echo "Aucun changement à enregistrer."
-          else
-            git commit -m "Mise à jour automatique de l'agenda RSS"
-            git push
-          fi
 
       - name: Configurer GitHub Pages
         uses: actions/configure-pages@v5

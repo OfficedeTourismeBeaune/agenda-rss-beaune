@@ -1,80 +1,133 @@
-# Agenda RSS automatique — Beaune & Pays Beaunois
+# Agenda RSS — Beaune & Pays Beaunois
 
-Ce projet génère automatiquement un **flux RSS de 6 événements** destiné à Mailchimp à partir du flux public :
+Ce dépôt publie un **flux RSS hebdomadaire de 6 événements** destiné à Mailchimp.
 
-`https://www.beaune-tourisme.fr/playlist/35902.rss`
+## Fonctionnement actuel
 
-## Ce qu'il fait automatiquement
+La sélection est mise à jour chaque **mercredi à 9 h (Europe/Paris)**.
 
-Chaque jeudi à 07:15, heure de Paris :
+Le fonctionnement actuellement validé est le suivant :
 
-1. récupération des événements du flux source ;
-2. lecture des fiches pour récupérer si possible dates, commune, image et description ;
-3. ciblage de la semaine suivante, du lundi au dimanche ;
-4. sélection de 6 événements sans reprendre simplement les 6 premiers ;
-5. diversification par commune et par thématique ;
-6. priorité aux événements illustrés et ponctuels ;
-7. pénalisation des événements utilisés au cours des 2 semaines précédentes ;
-8. génération du RSS et d'une page d'aperçu ;
-9. publication automatique sur GitHub Pages.
+1. sélectionner exactement 6 événements pour la semaine suivante, du lundi au dimanche ;
+2. vérifier les dates, communes, titres, descriptions, liens et images ;
+3. consulter `docs/history.json` pour éviter de reprendre trop souvent les mêmes événements ;
+4. mettre à jour directement :
+   - `docs/feed.xml`
+   - `docs/index.html`
+   - `docs/history.json`
+5. laisser GitHub Pages publier les fichiers ;
+6. créer ensuite manuellement la campagne Mailchimp.
 
-La sélection est stable pendant toute la semaine.
+Le script `generate_feed.py` n'est plus utilisé pour la génération hebdomadaire courante.
 
-## Hébergement gratuit
+## Dépôt et connexion GitHub
 
-La solution utilise un dépôt GitHub **public** avec GitHub Pages et GitHub Actions.
+Toujours utiliser la connexion GitHub de l'Office :
 
-### Installation unique
+- compte : `OfficedeTourismeBeaune`
+- dépôt : `OfficedeTourismeBeaune/agenda-rss-beaune`
+- branche : `main`
 
-1. créer un dépôt GitHub public, par exemple `agenda-rss-beaune` ;
-2. déposer tous les fichiers de ce ZIP dans le dépôt ;
-3. ouvrir **Settings → Pages** ;
-4. dans **Build and deployment → Source**, choisir **GitHub Actions** ;
-5. ouvrir l'onglet **Actions** et lancer une première fois :
-   **Mettre à jour l'agenda RSS → Run workflow**.
+Avant toute lecture ou écriture automatisée, vérifier que le dépôt apparaît bien dans la liste des dépôts accessibles avec ce compte.
 
-Une fois le workflow terminé, GitHub Pages donnera l'URL publique du site.
-Le flux sera disponible à :
+Si un accès direct retourne une erreur 404 alors que le dépôt apparaît dans cette liste, considérer d'abord qu'il s'agit d'un problème ponctuel de connexion ou d'autorisation. Ne pas basculer automatiquement vers un autre compte GitHub.
 
-`https://VOTRE-COMPTE.github.io/NOM-DU-DEPOT/feed.xml`
+## Règles de sélection
 
-La racine du site affiche également un aperçu visuel des 6 événements choisis.
+La sélection doit contenir exactement 6 événements :
 
-## Bloc Mailchimp
+- réellement programmés pendant la semaine cible ;
+- plutôt ponctuels que très récurrents ;
+- variés en thèmes et en communes ;
+- non terminés ;
+- sans doublons ;
+- en évitant les événements déjà utilisés récemment, sauf intérêt éditorial particulier.
 
-Dans le bloc RSS/Code Mailchimp :
+`docs/history.json` doit être consulté avant la sélection finale.
+
+## Validation obligatoire des images
+
+Chaque événement doit avoir une image valide avant publication.
+
+Priorité aux images provenant directement de :
+
+1. la fiche Beaune Tourisme ;
+2. Tourinsoft / Cloudly ;
+3. à défaut, une source officielle de l'organisateur.
+
+### Avant publication
+
+Pour chaque URL d'image :
+
+- vérifier qu'elle se charge réellement ;
+- vérifier qu'elle renvoie bien une image ;
+- refuser toute URL qui renvoie une erreur, une page HTML, un cache miss ou une ressource inaccessible ;
+- si l'image échoue, chercher une autre image valide de la même fiche ou une image officielle de remplacement.
+
+**Ne jamais publier une carte avec une image cassée.**
+
+Les 6 images doivent être validées avant toute écriture dans le dépôt.
+
+## Format du flux
+
+Le titre du canal doit être mis à jour chaque semaine :
+
+`du [date de début] au [date de fin] [année]`
+
+Exemple :
+
+`du 5 au 11 octobre 2026`
+
+La description suit le format :
+
+`Retrouvez tous les événements de [mois] [année] sur`
+
+Pour une semaine à cheval sur deux mois, utiliser le mois qui contient le plus de jours de la semaine cible. En cas d'égalité, utiliser le mois de la date de fin.
+
+## Design Mailchimp
+
+Le design validé des cartes doit être conservé :
+
+- fond `#fbf8f5`
+- border-radius : `8px`
+- image à gauche : 36 %
+- texte à droite : 64 %
+- padding : 14px
+- date / commune : 11px, `#8b7770`, uppercase
+- titre : 17px, `#432f32`, bold
+- corps : 13px, `#55504e`
+- bouton : `#bd3d00`
+- marge basse : 22px
+
+## Contrôle après publication
+
+Après chaque mise à jour :
+
+1. relire `docs/feed.xml`, `docs/index.html` et `docs/history.json` depuis GitHub ;
+2. vérifier que `feed.xml` contient exactement 6 `<item>` ;
+3. vérifier que `index.html` affiche exactement 6 cartes ;
+4. vérifier les 6 liens d'événements ;
+5. revérifier les 6 images ;
+6. vérifier la page GitHub Pages.
+
+Page publique :
+
+https://officedetourismebeaune.github.io/agenda-rss-beaune/
+
+Flux RSS :
+
+https://officedetourismebeaune.github.io/agenda-rss-beaune/feed.xml
+
+## Mailchimp
+
+Bloc utilisé dans Mailchimp :
 
 ```text
-*|FEEDBLOCK:https://VOTRE-COMPTE.github.io/NOM-DU-DEPOT/feed.xml|*
+*|FEEDBLOCK:https://officedetourismebeaune.github.io/agenda-rss-beaune/feed.xml|*
 *|FEEDITEMS:[$count=6]|*
 *|FEEDITEM:CONTENT_FULL|*
 *|END:FEEDITEMS|*
 *|END:FEEDBLOCK|*
 ```
 
-Le design validé des cartes est déjà intégré dans chaque élément du RSS via `content:encoded` :
-- fond beige clair ;
-- image à gauche ;
-- date + commune ;
-- titre prune ;
-- texte court ;
-- bouton terracotta « Découvrir ».
-
-## Pourquoi ce système évite le problème actuel
-
-Mailchimp ne choisit plus lui-même les 6 premiers événements du gros flux.
-Il reçoit directement un flux qui **ne contient que les 6 événements sélectionnés** pour la semaine.
-
-## Réglages
-
-Dans `.github/workflows/update-feed.yml` :
-- `COUNT: "6"` = nombre d'événements ;
-- le cron = jour/heure de génération.
-
-Dans `generate_feed.py` :
-- `MAX_PER_CITY = 2`
-- `MAX_PER_CATEGORY = 2`
-
-## Important
-
-Le système dépend du flux public Beaune Tourisme et de la structure des fiches événements. Si le site change fortement, le script pourra nécessiter une adaptation.
+La campagne Mailchimp reste créée manuellement.

@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: sync-event-images
@@ -18,6 +20,10 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,10 +46,22 @@ jobs:
         run: |
           if git diff --quiet && [ -z "$(git status --porcelain docs/assets/events)" ]; then
             echo "No image changes."
-            exit 0
+          else
+            git config user.name "OfficedeTourismeBeaune"
+            git config user.email "clement.besnard@beaune-tourisme.fr"
+            git add docs/feed.xml docs/index.html docs/assets/events
+            git commit -m "agenda: sync exact event images from Beaune Tourisme"
+            git push
           fi
-          git config user.name "OfficedeTourismeBeaune"
-          git config user.email "clement.besnard@beaune-tourisme.fr"
-          git add docs/feed.xml docs/index.html docs/assets/events
-          git commit -m "agenda: sync exact event images from Beaune Tourisme"
-          git push
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+      - name: Deploy synchronized agenda to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

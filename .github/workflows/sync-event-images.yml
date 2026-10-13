@@ -3,10 +3,13 @@ name: Sync event images from Beaune Tourisme
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
+      - "docs/feed.xml"
+      - "docs/index.html"
       - "docs/history.json"
-      - "scripts/sync_event_images.py"
-      - ".github/workflows/sync-event-images.yml"
+      - "scripts/**"
+      - ".github/workflows/**"
 
 permissions:
   contents: write
@@ -14,54 +17,57 @@ permissions:
   id-token: write
 
 concurrency:
-  group: sync-event-images
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   sync:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install image extractor dependencies
+      - name: Install dependencies
         run: python -m pip install --disable-pip-version-check requests beautifulsoup4 pillow
-
+      - name: Validate complete edition before synchronization
+        run: python scripts/validate_agenda.py
       - name: Pull exact images from Beaune Tourisme event pages
         run: python scripts/sync_event_images.py
-
-      - name: Commit synchronized images and feed
+      - name: Validate six synchronized images
+        run: python scripts/validate_agenda.py --local-images
+      - name: Commit synchronized edition without overwriting concurrent changes
         shell: bash
         run: |
-          if git diff --quiet && [ -z "$(git status --porcelain docs/assets/events)" ]; then
-            echo "No image changes."
-          else
-            git config user.name "OfficedeTourismeBeaune"
-            git config user.email "clement.besnard@beaune-tourisme.fr"
-            git add docs/feed.xml docs/index.html docs/assets/events
-            git commit -m "agenda: sync exact event images from Beaune Tourisme"
-            git push
+          git config user.name "OfficedeTourismeBeaune"
+          git config user.email "clement.besnard@beaune-tourisme.fr"
+          git add docs/feed.xml docs/index.html docs/assets/events
+          if ! git diff --cached --quiet; then
+            git commit -m "agenda: synchronize exact event images"
           fi
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Prepare Pages artifact
-        uses: actions/upload-pages-artifact@v3
+          git fetch origin main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            git merge-base --is-ancestor origin/main HEAD || {
+              echo "A newer edition arrived; refusing to publish a stale checkout."
+              exit 1
+            }
+            git push origin HEAD:main
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: ./docs
-
-      - name: Deploy synchronized agenda to GitHub Pages
+      - name: Deploy complete synchronized agenda
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify public RSS, preview and all six images
+        run: python scripts/validate_agenda.py --published
+

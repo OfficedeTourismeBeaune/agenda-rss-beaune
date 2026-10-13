@@ -2,16 +2,20 @@
 from __future__ import annotations
 
 import io
+import html
 import json
 import re
 import sys
 import time
+import tempfile
 from pathlib import Path
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
 from PIL import Image
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 ROOT = Path(__file__).resolve().parents[1]
 FEED = ROOT / "docs" / "feed.xml"
@@ -21,6 +25,7 @@ PUBLIC_BASE = "https://officedetourismebeaune.github.io/agenda-rss-beaune/assets
 UA = "Mozilla/5.0 (compatible; BeauneAgendaBot/1.0; +https://www.beaune-tourisme.fr/)"
 
 session = requests.Session()
+session.mount("https://", HTTPAdapter(max_retries=Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])))
 session.headers.update({"User-Agent": UA, "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.6"})
 
 
@@ -139,7 +144,7 @@ def download_as_jpeg(image_url: str, out: Path) -> None:
 
 
 def clean_page_url(url: str) -> str:
-    return url.replace("&amp;", "&")
+    return html.unescape(url)
 
 
 def slug_from_guid(guid: str) -> str:
@@ -156,6 +161,9 @@ def main():
         raise RuntimeError(f"Le flux doit contenir exactement 6 items, trouvé: {len(items)}")
 
     changes = []
+    replacements = []
+    staging = tempfile.TemporaryDirectory()
+    staged_assets = []
     for item in items:
         title_m = re.search(r"<title>(.*?)</title>", item, flags=re.S)
         link_m = re.search(r"<link>(.*?)</link>", item, flags=re.S)
@@ -164,21 +172,32 @@ def main():
         if not all((title_m, link_m, guid_m, img_m)):
             raise RuntimeError("Item incomplet dans feed.xml")
 
-        title = re.sub(r"\s+", " ", title_m.group(1)).strip()
+        title = html.unescape(re.sub(r"\s+", " ", title_m.group(1)).strip())
         page_url = clean_page_url(link_m.group(1).strip())
         guid = re.sub(r"\s+", "-", guid_m.group(1)).strip()
         old_src = img_m.group(1).replace("&amp;", "&")
 
         image_url = extract_main_image(page_url, title)
         dest_name = slug_from_guid(guid) + ".jpg"
-        dest = ASSET_DIR / dest_name
+        dest = Path(staging.name) / dest_name
         download_as_jpeg(image_url, dest)
 
         public = PUBLIC_BASE + dest_name
-        feed = feed.replace(old_src.replace("&", "&amp;"), public).replace(old_src, public)
-        index = index.replace(old_src.replace("&", "&amp;"), public).replace(old_src, public)
+        # Replace within this item only: two events may initially share a URL.
+        updated = item.replace(old_src.replace("&", "&amp;"), public).replace(old_src, public)
+        replacements.append(updated)
+        staged_assets.append((dest, ASSET_DIR / dest_name))
         changes.append((title, image_url, public))
         time.sleep(0.3)
+
+    iterator = iter(replacements)
+    feed = re.sub(r"<item>.*?</item>", lambda _: "<item>" + next(iterator) + "</item>", feed, flags=re.S)
+    # Replace each preview image in order, not globally by source URL.
+    images = list(re.finditer(r'<img\s+[^>]*src="([^"]+)"', index, flags=re.S))
+    if len(images) != 6:
+        raise RuntimeError("La page doit contenir exactement 6 images")
+    for match, change in reversed(list(zip(images, changes))):
+        index = index[:match.start(1)] + change[2] + index[match.end(1):]
 
     # XML sanity checks: no media namespace/tag and exactly 6 complete content blocks.
     if "<media:content" in feed or "xmlns:media" in feed:
@@ -186,6 +205,12 @@ def main():
     if feed.count("<item>") != 6 or feed.count("<content:encoded>") != 6:
         raise RuntimeError("Structure RSS invalide après remplacement")
 
+    import xml.etree.ElementTree as ET
+    ET.fromstring(feed)
+    ASSET_DIR.mkdir(parents=True, exist_ok=True)
+    for source, target in staged_assets:
+        target.write_bytes(source.read_bytes())
+    staging.cleanup()
     FEED.write_text(feed, encoding="utf-8")
     INDEX.write_text(index, encoding="utf-8")
 
@@ -196,3 +221,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -49,24 +49,25 @@ La sélection doit contenir exactement 6 événements :
 
 Chaque événement doit avoir une image valide avant publication.
 
-Priorité aux images provenant directement de :
+Les six images proviennent exclusivement des fiches Beaune Tourisme exactes : image Event JSON-LD, sinon og:image, sinon image principale de la fiche. Aucune image de remplacement externe ou générique.
 
-1. la fiche Beaune Tourisme ;
-2. Tourinsoft / Cloudly ;
-3. à défaut, une source officielle de l'organisateur.
+Le workflow unique `.github/workflows/sync-event-images.yml` contrôle la cohérence des trois fichiers, télécharge les images en JPEG, valide les six fichiers locaux, puis publie et vérifie les fichiers publics. Une erreur bloque le déploiement et préserve la dernière édition publiée.
 
-### Avant publication
+Les trois fichiers éditoriaux doivent être écrits dans **un seul commit atomique**, avec vérification du SHA courant de main. Ne pas effectuer trois commits séparés. Le workflow se déclenche sur toute modification du flux, de la page, de l’historique ou des scripts. Les exécutions Pages sont sérialisées.
 
-Pour chaque URL d'image :
+Le traitement des images remplace chaque visuel dans sa propre carte, même si plusieurs cartes utilisaient initialement la même URL. Les téléchargements sont préparés avant modification des fichiers éditoriaux.
 
-- vérifier qu'elle se charge réellement ;
-- vérifier qu'elle renvoie bien une image ;
-- refuser toute URL qui renvoie une erreur, une page HTML, un cache miss ou une ressource inaccessible ;
-- si l'image échoue, chercher une autre image valide de la même fiche ou une image officielle de remplacement.
+L’automatisation ChatGPT effectue la sélection éditoriale le mercredi à 9 h Europe/Paris ; le contrôle de secours reste à 13 h. GitHub Actions assure ensuite les images, les validations et la publication. Aucun envoi Mailchimp automatique.
 
-**Ne jamais publier une carte avec une image cassée.**
+## Vérification technique
 
-Les 6 images doivent être validées avant toute écriture dans le dépôt.
+```sh
+python scripts/validate_agenda.py
+python scripts/sync_event_images.py
+python scripts/validate_agenda.py --local-images
+# Après déploiement seulement :
+python scripts/validate_agenda.py --published
+```
 
 ## Format du flux
 
@@ -131,3 +132,4 @@ Bloc utilisé dans Mailchimp :
 ```
 
 La campagne Mailchimp reste créée manuellement.
+

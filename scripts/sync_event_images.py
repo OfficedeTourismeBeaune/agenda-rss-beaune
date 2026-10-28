@@ -13,7 +13,7 @@ from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
-from PIL import Image
+from PIL import Image, ImageFile
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -23,6 +23,7 @@ INDEX = ROOT / "docs" / "index.html"
 ASSET_DIR = ROOT / "docs" / "assets" / "events"
 PUBLIC_BASE = "https://officedetourismebeaune.github.io/agenda-rss-beaune/assets/events/"
 UA = "Mozilla/5.0 (compatible; BeauneAgendaBot/1.0; +https://www.beaune-tourisme.fr/)"
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 session = requests.Session()
 session.mount("https://", HTTPAdapter(max_retries=Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])))

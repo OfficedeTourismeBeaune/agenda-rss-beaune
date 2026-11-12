@@ -198,8 +198,8 @@ def main():
     feed = re.sub(r"<item>.*?</item>", lambda _: "<item>" + next(iterator) + "</item>", feed, flags=re.S)
     # Replace each preview image in order, not globally by source URL.
     images = list(re.finditer(r'<img\s+[^>]*src="([^"]+)"', index, flags=re.S))
-    if len(images) != 6:
-        raise RuntimeError("La page doit contenir exactement 6 images")
+    if len(images) != len(changes):
+        raise RuntimeError(f"La page doit contenir {len(changes)} images, trouvé : {len(images)}")
     for match, change in reversed(list(zip(images, changes))):
         index = index[:match.start(1)] + change[2] + index[match.end(1):]
 

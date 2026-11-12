@@ -158,8 +158,8 @@ def main():
     index = INDEX.read_text(encoding="utf-8")
 
     items = re.findall(r"<item>(.*?)</item>", feed, flags=re.S)
-    if len(items) != 6:
-        raise RuntimeError(f"Le flux doit contenir exactement 6 items, trouvé: {len(items)}")
+    if len(items) != 7:
+        raise RuntimeError(f"Le flux doit contenir exactement 7 items, trouvé: {len(items)}")
 
     changes = []
     replacements = []
@@ -170,13 +170,13 @@ def main():
         link_m = re.search(r"<link>(.*?)</link>", item, flags=re.S)
         guid_m = re.search(r"<guid[^>]*>(.*?)</guid>", item, flags=re.S)
         img_m = re.search(r'<img\s+[^>]*src="([^"]+)"', item, flags=re.S)
-        if not all((title_m, link_m, guid_m, img_m)):
+        if not all((title_m, link_m, guid_m)):
             raise RuntimeError("Item incomplet dans feed.xml")
 
         title = html.unescape(re.sub(r"\s+", " ", title_m.group(1)).strip())
         page_url = clean_page_url(link_m.group(1).strip())
         guid = re.sub(r"\s+", "-", guid_m.group(1)).strip()
-        old_src = img_m.group(1).replace("&amp;", "&")
+        if not img_m:\n            replacements.append(item)  # Typographic poster card: no image to synchronize.\n            continue\n        old_src = img_m.group(1).replace("&amp;", "&")
 
         image_url = extract_main_image(page_url, title)
         dest_name = slug_from_guid(guid) + ".jpg"
@@ -203,7 +203,7 @@ def main():
     # XML sanity checks: no media namespace/tag and exactly 6 complete content blocks.
     if "<media:content" in feed or "xmlns:media" in feed:
         raise RuntimeError("media:content ne doit pas être présent")
-    if feed.count("<item>") != 6 or feed.count("<content:encoded>") != 6:
+    if feed.count("<item>") != 7 or feed.count("<content:encoded>") != 7:
         raise RuntimeError("Structure RSS invalide après remplacement")
 
     import xml.etree.ElementTree as ET

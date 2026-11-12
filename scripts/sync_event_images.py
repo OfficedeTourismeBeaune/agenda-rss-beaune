@@ -158,8 +158,8 @@ def main():
     index = INDEX.read_text(encoding="utf-8")
 
     items = re.findall(r"<item>(.*?)</item>", feed, flags=re.S)
-    if len(items) != 7:
-        raise RuntimeError(f"Le flux doit contenir exactement 7 items, trouvé: {len(items)}")
+    if len(items) != 6:
+        raise RuntimeError(f"Le flux doit contenir exactement 6 items, trouvé: {len(items)}")
 
     changes = []
     replacements = []
@@ -206,7 +206,7 @@ def main():
     # XML sanity checks: no media namespace/tag and exactly 6 complete content blocks.
     if "<media:content" in feed or "xmlns:media" in feed:
         raise RuntimeError("media:content ne doit pas être présent")
-    if feed.count("<item>") != 7 or feed.count("<content:encoded>") != 7:
+    if feed.count("<item>") != 6 or feed.count("<content:encoded>") != 6:
         raise RuntimeError("Structure RSS invalide après remplacement")
 
     import xml.etree.ElementTree as ET

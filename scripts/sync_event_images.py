@@ -176,7 +176,10 @@ def main():
         title = html.unescape(re.sub(r"\s+", " ", title_m.group(1)).strip())
         page_url = clean_page_url(link_m.group(1).strip())
         guid = re.sub(r"\s+", "-", guid_m.group(1)).strip()
-        if not img_m:\n            replacements.append(item)  # Typographic poster card: no image to synchronize.\n            continue\n        old_src = img_m.group(1).replace("&amp;", "&")
+        if not img_m:
+            replacements.append(item)  # Typographic poster card: no image to synchronize.
+            continue
+        old_src = img_m.group(1).replace("&amp;", "&")
 
         image_url = extract_main_image(page_url, title)
         dest_name = slug_from_guid(guid) + ".jpg"

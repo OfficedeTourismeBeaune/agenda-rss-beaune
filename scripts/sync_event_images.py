@@ -8,6 +8,7 @@ import re
 import sys
 import time
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -22,6 +23,7 @@ FEED = ROOT / "docs" / "feed.xml"
 INDEX = ROOT / "docs" / "index.html"
 ASSET_DIR = ROOT / "docs" / "assets" / "events"
 PUBLIC_BASE = "https://officedetourismebeaune.github.io/agenda-rss-beaune/assets/events/"
+CONTENT = "{http://purl.org/rss/1.0/modules/content/}encoded"
 UA = "Mozilla/5.0 (compatible; BeauneAgendaBot/1.0; +https://www.beaune-tourisme.fr/)"
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -158,8 +160,8 @@ def main():
     index = INDEX.read_text(encoding="utf-8")
 
     items = re.findall(r"<item>(.*?)</item>", feed, flags=re.S)
-    if len(items) != 6:
-        raise RuntimeError(f"Le flux doit contenir exactement 6 items, trouvé: {len(items)}")
+    if not items:
+        raise RuntimeError("Le RSS doit contenir au moins un événement")
 
     changes = []
     replacements = []
@@ -203,14 +205,12 @@ def main():
     for match, change in reversed(list(zip(images, changes))):
         index = index[:match.start(1)] + change[2] + index[match.end(1):]
 
-    # XML sanity checks: no media namespace/tag and exactly 6 complete content blocks.
+    # Each RSS item must retain one content block.
     if "<media:content" in feed or "xmlns:media" in feed:
         raise RuntimeError("media:content ne doit pas être présent")
-    if feed.count("<item>") != 6 or feed.count("<content:encoded>") != 6:
+    updated_items = ET.fromstring(feed).findall("./channel/item")
+    if len(updated_items) != len(items) or any(len(item.findall(CONTENT)) != 1 for item in updated_items):
         raise RuntimeError("Structure RSS invalide après remplacement")
-
-    import xml.etree.ElementTree as ET
-    ET.fromstring(feed)
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
     for source, target in staged_assets:
         target.write_bytes(source.read_bytes())

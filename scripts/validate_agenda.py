@@ -28,17 +28,21 @@ def validate(published=False, local_images=False):
     history = json.loads(history_bytes)
     channel = ET.fromstring(feed).find("channel")
     items = channel.findall("item")
-    assert len(items) == 6, "Le RSS doit contenir 6 événements"
+    event_count = len(items)
+    assert event_count > 0, "Le RSS doit contenir au moins un événement"
     links = [i.findtext("link") for i in items]
-    assert len(set(map(event_id, links))) == 6, "Événements en doublon"
-    assert len({i.findtext("guid") for i in items}) == 6, "GUID en doublon"
+    assert all(links), "Lien d’événement manquant"
+    assert len(set(map(event_id, links))) == event_count, "Événements en doublon"
+    guids = [i.findtext("guid") for i in items]
+    assert all(guids), "GUID manquant"
+    assert len(set(guids)) == event_count, "GUID en doublon"
     latest = max(history)
-    assert len(history[latest]) == 6, "Historique incomplet"
+    assert len(history[latest]) == event_count, "Historique incomplet"
     assert set(map(event_id, history[latest])) == set(map(event_id, links)), "RSS et historique incohérents"
 
     page = BeautifulSoup(index, "html.parser")
     heads = page.find_all("h2")
-    assert len(heads) == 6, "La page doit présenter 6 événements"
+    assert len(heads) == event_count, f"La page doit présenter {event_count} événements"
     expected_titles = [i.findtext("title") for i in items]
     assert [h.get_text(strip=True) for h in heads] == expected_titles, "Titres différents entre RSS et page"
 

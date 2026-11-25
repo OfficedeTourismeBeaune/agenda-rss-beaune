@@ -11,6 +11,7 @@ on:
       - "docs/feed.xml"
       - "docs/index.html"
       - "docs/history.json"
+      - "docs/test-affiches/**"
       - "scripts/**"
       - ".github/workflows/**"
 
@@ -47,22 +48,29 @@ jobs:
         shell: bash
         run: |
           if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ] && timeout 90s python -c "from scripts.validate_agenda import validate; validate(published=True)"; then
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-            echo "Public edition is already correct; no redeployment."
+            echo "sync_needed=false" >> "$GITHUB_OUTPUT"
+            if [ -d docs/test-affiches ] && ! timeout 60s python -c "from scripts.validate_test_preview import validate_public; validate_public()"; then
+              echo "needed=true" >> "$GITHUB_OUTPUT"
+              echo "Production is correct; deploying only to publish the separate test preview."
+            else
+              echo "needed=false" >> "$GITHUB_OUTPUT"
+              echo "Public edition is already correct; no redeployment."
+            fi
           else
+            echo "sync_needed=true" >> "$GITHUB_OUTPUT"
             echo "needed=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Validate complete edition before synchronization
-        if: steps.recovery.outputs.needed == 'true'
+        if: steps.recovery.outputs.sync_needed == 'true'
         run: python scripts/validate_agenda.py
       - name: Pull exact images from Beaune Tourisme event pages
-        if: steps.recovery.outputs.needed == 'true'
+        if: steps.recovery.outputs.sync_needed == 'true'
         run: python scripts/sync_event_images.py
       - name: Validate six synchronized images
-        if: steps.recovery.outputs.needed == 'true'
+        if: steps.recovery.outputs.sync_needed == 'true'
         run: python scripts/validate_agenda.py --local-images
       - name: Commit synchronized edition without overwriting concurrent changes
-        if: steps.recovery.outputs.needed == 'true'
+        if: steps.recovery.outputs.sync_needed == 'true'
         shell: bash
         run: |
           git config user.name "OfficedeTourismeBeaune"
@@ -79,6 +87,9 @@ jobs:
             }
             git push origin HEAD:main
           fi
+      - name: Validate separate test preview locally
+        if: steps.recovery.outputs.needed == 'true'
+        run: python scripts/validate_test_preview.py --local
       - uses: actions/configure-pages@v5
         if: steps.recovery.outputs.needed == 'true'
       - uses: actions/upload-pages-artifact@v3
@@ -127,5 +138,7 @@ jobs:
           artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Verify public RSS, preview and all six images
         if: steps.recovery.outputs.needed == 'true'
-        run: python scripts/validate_agenda.py --published
+        run: |
+          python scripts/validate_agenda.py --published
+          python scripts/validate_test_preview.py --published
 
